@@ -7,87 +7,75 @@ from flask import Flask
 
 app = Flask(__name__)
 
+# =====================================================================
+# CONFIGURACIÓN COMPILADA ABSOLUTA - SIN DEPENDENCIAS EXTERNAS
+# =====================================================================
 SYMBOL = "ETHUSDT"  
 INTERVALO_SEGUNDOS = 30  
-TELEGRAM_CHAT_ID = "@bunkerop"  
 
-# Endpoints extraídos de tu entorno blindado en Render
-ENDPOINT_TELEGRAM = os.environ.get("URL_TELEGRAM", "").strip()
+# Forzado con ID numérico del canal público para evitar desvíos de alias
+TELEGRAM_TOKEN = "8991347344:AAHDSp718hsWqd8uxceBN9D0_n5ZXqR6V1Q"
+TELEGRAM_CHAT_ID = "-1004335003036"  
 
 def enviar_telegram(mensaje):
-    """Envío nativo limpio hacia la API de Telegram verificada."""
-    if not ENDPOINT_TELEGRAM:
-        print("❌ ERROR: La variable 'URL_TELEGRAM' está vacía.")
-        sys.stdout.flush()
-        return
-
+    """Envío nativo e independiente sin uso de f-strings en zona crítica."""
+    url = "https://telegram.org" + TELEGRAM_TOKEN + "/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mensaje, "parse_mode": "Markdown"}
-    cabeceras = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-    }
+    cabeceras = {"User-Agent": "Mozilla/5.0"}
     
     try: 
-        res = requests.post(ENDPOINT_TELEGRAM, json=payload, headers=cabeceras, timeout=10)
-        print(f"📡 [TELEGRAM] Status: {res.status_code}")
+        res = requests.post(url, json=payload, headers=cabeceras, timeout=10)
+        print("📡 [TELEGRAM ESP_REPLY] Status: " + str(res.status_code) + " | " + str(res.text))
         sys.stdout.flush()
     except Exception as e: 
-        print(f"❌ Fallo crítico hacia Telegram: {e}")
+        print("❌ Fallo de red Telegram: " + str(e))
         sys.stdout.flush()
 
 def obtener_datos_mercado():
-    """Oráculos alternativos de alta disponibilidad blindados contra bloqueos a hosting."""
-    
-    # Camuflaje avanzado de cabeceras web para engañar sistemas anti-bot de las APIs
-    cabeceras_web = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "application/json",
-        "Accept-Language": "en-US,en;q=0.9"
+    """Lógica pura de oráculos de nivel 1 con extracción de datos crudos."""
+    cabeceras = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json"
     }
     
-    # PASARELA 1: Endpoint Público Descentralizado de KuCoin (Jamás bloquea IPs de hosting)
+    # ORÁCULO 1: KuCoin API pública (Idónea para servidores Cloud en EE.UU.)
     try:
-        url_kucoin = "https://kucoin.com"
-        res = requests.get(url_kucoin, headers=cabeceras_web, timeout=8)
-        
-        # Verificación estricta de que la respuesta sea un texto JSON válido antes de parsear
-        if res.status_code == 200 and "data" in res.text:
-            data_json = res.json()
-            precio = float(data_json["data"]["price"])
-            print(f"🟩 ORÁCULO 1 COMPILADO (KuCoin Feed) -> ETH: ${precio:.2f}")
+        res = requests.get("https://kucoin.com", headers=cabeceras, timeout=8)
+        if res.status_code == 200:
+            data = res.json()
+            precio = float(data["data"]["price"])
+            print("🟩 ORÁCULO 1 (KuCoin) -> ETH: $" + str(precio))
             sys.stdout.flush()
             return precio, 0, 0
     except Exception as e:
-        print(f"⚠️ Pasarela 1 (KuCoin Open Feed) saturada: {e}")
+        print("⚠️ Pasarela KuCoin descartada: " + str(e))
         sys.stdout.flush()
 
-    # PASARELA 2: Endpoint Espejo Alternativo de Gate.io (Evasión de Firewalls regionales)
+    # ORÁCULO 2: Gate.io API de tickers spot
     try:
-        url_gate = "https://gateio.ws"
-        res = requests.get(url_gate, headers=cabeceras_web, timeout=8)
-        
+        res = requests.get("https://gateio.ws", headers=cabeceras, timeout=8)
         if res.status_code == 200:
-            data_json = res.json()
-            # Gate.io devuelve una lista con el ticker solicitado
-            precio = float(data_json[0]["last"])
-            print(f"🟩 ORÁCULO 2 COMPILADO (Gate Espejo) -> ETH: ${precio:.2f}")
+            data = res.json()
+            precio = float(data[0]["last"])
+            print("🟩 ORÁCULO 2 (GateIO) -> ETH: $" + str(precio))
             sys.stdout.flush()
             return precio, 0, 0
     except Exception as e:
-        print(f"⚠️ Pasarela 2 (Gate Espejo) saturada: {e}")
+        print("⚠️ Pasarela GateIO descartada: " + str(e))
         sys.stdout.flush()
 
     return None, None, None
 
 def bucle_radar():
-    """Monitorización ininterrumpida."""
+    """Bucle aislado continuo de monitorización."""
     print("📡 RADAR INYECTADO: INICIANDO MONITOR INDESTRUCTIBLE")
     sys.stdout.flush()
     
-    enviar_telegram("📡 *Radar Watson Reestabilizado*\nHack de evasión regional activado. Monitoreando ETH...")
+    enviar_telegram("📡 *Radar Watson Reestabilizado*\nMonitoreando precio en vivo de ETH...")
 
     precio_anterior, _, _ = obtener_datos_mercado()
     if not precio_anterior:
-        precio_anterior = 3420.0
+        precio_anterior = 3430.0
     
     while True:
         try:
@@ -95,20 +83,20 @@ def bucle_radar():
             precio_actual, _, _ = obtener_datos_mercado()
             
             if not precio_actual:
-                print("⏳ Todos los oráculos de datos de hosting están saturados. Reintentando...")
+                print("⏳ Oráculos saturados. Esperando próxima iteración...")
                 sys.stdout.flush()
                 continue
                 
             delta = ((precio_actual - precio_anterior) / precio_anterior) * 100
-            print(f"[RADAR] ETH: ${precio_actual:.2f} | Var: {delta:+.4f}%")
+            print("[RADAR] ETH: $" + str(precio_actual) + " | Var: " + str(delta) + "%")
             sys.stdout.flush()
             
-            # Formateo de notificación limpia para canal público
-            enviar_telegram(f"🎯 *Radar Watson Operando*\nETH: `${precio_actual:.2f}`\nVar: {delta:+.3f}%")
+            msg = "🎯 *Radar Watson Operando*\nETH: `$" + str(precio_actual) + "`\nVar: " + str(round(delta, 3)) + "%"
+            enviar_telegram(msg)
                 
             precio_anterior = precio_actual
         except Exception as e:
-            print(f"❌ Error en ejecución del radar: {e}")
+            print("❌ Error en hilo radar: " + str(e))
             sys.stdout.flush()
             time.sleep(5)
 
@@ -116,7 +104,7 @@ def bucle_radar():
 def home():
     return "📡 Radar Hack Activo", 200
 
-# Lanzamiento del hilo de fondo aislado
+# Despliegue en hilo paralelo seguro
 threading.Thread(target=bucle_radar, daemon=True).start()
 
 if __name__ == '__main__':
