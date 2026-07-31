@@ -4,18 +4,16 @@ import threading
 import os
 import sys
 import json
-import base64
 from flask import Flask
 
 app = Flask(__name__)
 
 # =====================================================================
-# CONFIGURACIÓN COMPILADA NATIVA INDESTRUCTIBLE
+# CONFIGURACIÓN LIMPIA Y COMPILADA DIRECTA
 # =====================================================================
 SYMBOL = "ETHUSDT"  
 INTERVALO_SEGUNDOS = 30  
 
-# Credenciales físicas directas para la salida de Telegram
 TELEGRAM_TOKEN = "8991347344:AAHDSp718hsWqd8uxceBN9D0_n5ZXqR6V1Q"
 TELEGRAM_CHAT_ID = "@bunkerop"  
 
@@ -23,66 +21,56 @@ PORCENTAJE_SL = 0.0015
 PORCENTAJE_TP = 0.0022  
 
 def enviar_telegram(mensaje):
-    """Envío nativo estructurado hacia la API de Telegram."""
+    """Envío directo usando la estructura nativa oficial de Telegram."""
     if not TELEGRAM_TOKEN or ":" not in TELEGRAM_TOKEN:
-        print("❌ ERROR: Estructura de token vacía o rota.")
+        print("❌ ERROR: Token con formato inválido o vacío.")
         sys.stdout.flush()
         return
 
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID, 
-        "text": mensaje, 
-        "parse_mode": "Markdown"
-    }
-    cabeceras = {"User-Agent": "Mozilla/5.0"}
     url = f"https://telegram.org{TELEGRAM_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mensaje, "parse_mode": "Markdown"}
+    cabeceras = {"User-Agent": "Mozilla/5.0"}
     
     try: 
         res = requests.post(url, json=payload, headers=cabeceras, timeout=10)
         print(f"📡 [TELEGRAM] Status: {res.status_code} | Respuesta: {res.text}")
         sys.stdout.flush()
     except Exception as e: 
-        print(f"❌ Fallo crítico de red hacia Telegram: {e}")
+        print(f"❌ Fallo crítico hacia Telegram: {e}")
         sys.stdout.flush()
 
 def obtener_datos_mercado():
-    """Extracción de precios usando decodificación en memoria inmune a alteraciones."""
-    cabeceras = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    """Bypassea el bloqueo regional usando el endpoint espejo libre api3 de Binance."""
+    cabeceras = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
-    # ORÁCULO 1: CryptoCompare público directo (Sustituye al saturado CoinGecko)
+    # CANAL 1: CryptoCompare Directo (Reemplaza a CoinGecko para evitar bloqueos Cloudflare)
     try:
-        # URL oculta: 'https://cryptocompare.com'
-        url_b64_1 = "aHR0cHM6Ly9taW4tYXBpLmNyeXB0b2NvbXBhcmUuY29tL2RhdGEvcHJpY2U/ZnN5bT1FVEgmdHN5bXM9VVNE"
-        endpoint_1 = base64.b64decode(url_b64_1).decode('utf-8')
-        
-        res = requests.get(endpoint_1, headers=cabeceras, timeout=8).json()
-        precio = float(res['USD'])
-        print(f"🟩 HACK EXITOSO (CryptoCompare Directo) -> ETH: ${precio:.2f}")
+        url = "https://cryptocompare.com"
+        res = requests.get(url, headers=cabeceras, timeout=6).json()
+        precio = float(res["USD"])
+        print(f"🟩 HACK EXITOSO (CryptoCompare) -> ETH: ${precio:.2f}")
         sys.stdout.flush()
         return precio, 5000000.0, 15000000.0
     except Exception as e:
-        print(f"⚠️ Oráculo Pasarela 1 inaccesible: {e}")
+        print(f"⚠️ Pasarela 1 (CryptoCompare) falló: {e}")
         sys.stdout.flush()
 
-    # ORÁCULO 2: Endpoint espejo global de Binance (api3 sin geobloqueo)
+    # CANAL 2: Endpoint api3 de Binance (Libre de geobloqueos geográficos estándar)
     try:
-        # URL oculta: 'https://binance.com'
-        url_b64_2 = "aHR0cHM6Ly9hcGkzLmJpbmFuY2UuY29tL2FwaS92My90aWNrZXIvcHJpY2U/c3ltYm9sPUVUSFVTRFQ="
-        endpoint_2 = base64.b64decode(url_b64_2).decode('utf-8')
-        
-        res = requests.get(endpoint_2, headers=cabeceras, timeout=8).json()
-        precio = float(res['price'])
-        print(f"🟩 HACK EXITOSO (Binance Mirror Directo) -> ETH: ${precio:.2f}")
+        url_binance = "https://binance.com"
+        res = requests.get(url_binance, headers=cabeceras, timeout=6).json()
+        precio = float(res["price"])
+        print(f"🟩 HACK EXITOSO (Binance Mirror) -> ETH: ${precio:.2f}")
         sys.stdout.flush()
         return precio, 5000000.0, 15000000.0
     except Exception as e:
-        print(f"⚠️ Oráculo Pasarela 2 inaccesible: {e}")
+        print(f"⚠️ Pasarela 2 (Binance Mirror) falló: {e}")
         sys.stdout.flush()
 
     return None, None, None
 
 def bucle_radar():
-    """Hilo de ejecución continuo aislado y optimizado para Render."""
+    """Bucle continuo de monitorización optimizado para Render."""
     print("📡 RADAR INYECTADO: INICIANDO MONITOR INDESTRUCTIBLE")
     sys.stdout.flush()
     
@@ -98,7 +86,7 @@ def bucle_radar():
             precio_actual, _, _ = obtener_datos_mercado()
             
             if not precio_actual:
-                print("⏳ Oráculos saturados o bloqueados temporalmente. Reintentando...")
+                print("⏳ Oráculos saturados. Esperando próxima iteración...")
                 sys.stdout.flush()
                 continue
                 
@@ -106,12 +94,12 @@ def bucle_radar():
             print(f"[RADAR] ETH: ${precio_actual:.2f} | Var: {delta:+.4f}%")
             sys.stdout.flush()
             
-            # Notificación de variación de precio enviada directamente al canal público
+            # Alerta instantánea formateada limpia
             enviar_telegram(f"🎯 *Radar Watson Operando*\nETH: `${precio_actual:.2f}`\nVar: {delta:+.3f}%")
                 
             precio_anterior = precio_actual
         except Exception as e:
-            print(f"❌ Error en ejecución del radar: {e}")
+            print(f"❌ Error en bucle principal: {e}")
             sys.stdout.flush()
             time.sleep(5)
 
@@ -119,7 +107,7 @@ def bucle_radar():
 def home():
     return "📡 Radar Hack Activo", 200
 
-# Inicialización segura en segundo plano para evitar bloqueos de Render
+# Encendido del subproceso en segundo plano
 threading.Thread(target=bucle_radar, daemon=True).start()
 
 if __name__ == '__main__':
