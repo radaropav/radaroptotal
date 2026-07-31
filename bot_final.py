@@ -8,16 +8,21 @@ from flask import Flask
 app = Flask(__name__)
 
 # =====================================================================
-# CONFIGURACIÓN COMPILADA REAL DE DERIVADOS Y SCALPING SUAVIZADO
+# CONFIGURACIÓN COMPILADA REAL DE DERIVADOS CON MEGA ENTRADAS URGENTES
 # =====================================================================
 SYMBOL = "ETHUSDT"  
 
 TOKEN_LIMPIO = "8991347344:AAHDSp718hsWqd8uxceBN9D0_n5ZXqR6V1Q"
 CHAT_ID_LIMPIO = "-1004335003036"  
 
-# Márgenes para operaciones cortas, rápidas y alcanzables en minutos
-PORCENTAJE_SL = 0.0015  # 0.15% para cortar pérdidas rápido
-PORCENTAJE_TP = 0.0022  # 0.22% para asegurar ganancias prontas
+# Márgenes para operaciones estándar de Scalping rápido
+PORCENTAJE_SL = 0.0015  # 0.15% Stop Loss estándar
+PORCENTAJE_TP = 0.0022  # 0.22% Take Profit estándar
+
+# Umbrales críticos para capturar las "MEGA ENTRADAS" institucionales
+# Si el precio se mueve más de 0.40% o el OI explota más de 0.80% en un ciclo, es una anomalía de alta ganancia
+UMBRAL_MEGA_PRECIO = 0.40
+UMBRAL_MEGA_OI = 0.80
 
 def enviar_telegram(mensaje):
     """Envío nativo con URL fraccionada de forma simple para evitar mutilaciones."""
@@ -75,11 +80,11 @@ def obtener_datos_mercado_y_oi():
     return precio, oi
 
 def bucle_radar():
-    """Bucle con suavizado de tiempo y filtro de confirmación para evitar señales falsas."""
-    print("📡 RADAR INYECTADO: CONFIGURANDO FILTRO DE SUAVIZADO")
+    """Bucle analítico con suavizado de 3m y bypass de alertas urgentes por alta volatilidad."""
+    print("📡 RADAR INYECTADO: CONFIGURANDO MODULO DE VOLATILIDAD")
     sys.stdout.flush()
     
-    enviar_telegram("📡 *Módulo de Suavizado Activado*\nVentana de análisis ampliada a 3 minutos con filtro de consistencia para Scalping seguro.")
+    enviar_telegram("📡 *Radar Watson Avanzado Activado*\nMonitoreo de 3 minutos activo + Escáner de Mega Entradas Institucionales inyectado.")
 
     precio_anterior, oi_anterior = obtener_datos_mercado_y_oi()
     if not precio_anterior:
@@ -87,10 +92,7 @@ def bucle_radar():
     if not oi_anterior:
         oi_anterior = 5000000.0
         
-    # Variables de memoria para el filtro de consistencia
     operacion_anterior = "ESPERAR"
-    
-    # Ajustamos el intervalo a 3 minutos (180 segundos) para eliminar el ruido rápido
     INTERVALO_SUAVIZADO = 180 
     
     while True:
@@ -104,32 +106,73 @@ def bucle_radar():
             delta_precio = ((precio_actual - precio_anterior) / precio_anterior) * 100
             delta_oi = ((oi_actual - oi_anterior) / oi_anterior) * 100
             
-            # --- EVALUACIÓN DE DIRECCIÓN CON UMBRAL DE FILTRO ---
-            if delta_precio > 0.015 and delta_oi > 0.03:
-                tendencia = "📈 ALCISTA (Confirmación por entrada de capital)"
-                operacion_actual = "LONG"
-            elif delta_precio < -0.015 and delta_oi > 0.03:
-                tendencia = "📉 BAJISTA (Confirmación por presión vendedora)"
-                operacion_actual = "SHORT"
+            # Inicialización de banderas de control
+            es_mega_entrada = False
+            setup_texto = ""
+            
+            # --- DETECTOR DE RUN INTENSIVO (MEGA ENTRADAS) ---
+            # Si el movimiento supera los umbrales institucionales, se activa el bypass de urgencia
+            if abs(delta_precio) >= UMBRAL_MEGA_PRECIO or abs(delta_oi) >= UMBRAL_MEGA_OI:
+                es_mega_entrada = True
+                if delta_precio > 0:
+                    tendencia = "🔥 ¡ALERTA CRÍTICA: RUPTURA ALCISTA INSTITUCIONAL! 🔥"
+                    operacion_actual = "MEGA_LONG"
+                else:
+                    tendencia = "🔥 ¡ALERTA CRÍTICA: CAPITULACIÓN BAJISTA VIOLENTA! 🔥"
+                    operacion_actual = "MEGA_SHORT"
             else:
-                tendencia = "↕️ ENTORNO NEUTRO / CONSOLIDACIÓN CORTA"
-                operacion_actual = "ESPERAR"
-                
-            # --- FILTRO DE CONSISTENCIA DE TRADING ---
+                # --- EVALUACIÓN DE DIRECCIÓN ESTÁNDAR SUAVIZADA ---
+                if delta_precio > 0.015 and delta_oi > 0.03:
+                    tendencia = "📈 ALCISTA (Confirmación por entrada de capital)"
+                    operacion_actual = "LONG"
+                elif delta_precio < -0.015 and delta_oi > 0.03:
+                    tendencia = "📉 BAJISTA (Confirmación por presión vendedora)"
+                    operacion_actual = "SHORT"
+                else:
+                    tendencia = "↕️ ENTORNO NEUTRO / CONSOLIDACIÓN CORTA"
+                    operacion_actual = "ESPERAR"
+
+            # --- FILTRO DE CONSISTENCIA DINÁMICO ---
             debe_notificar = False
             
-            if operacion_actual == "ESPERAR":
+            # Si es una mega entrada, ignoramos el filtro y notificamos de inmediato
+            if es_mega_entrada:
+                debe_notificar = True
+            elif operacion_actual == "ESPERAR":
                 debe_notificar = True
             elif operacion_actual == operacion_anterior:
                 debe_notificar = True
             else:
-                print("⏳ Tendencia inestable detectada. Filtrando señal...")
+                print("⏳ Ruido ordinario detectado. Filtrando señal...")
                 sys.stdout.flush()
                 debe_notificar = False
 
             if debe_notificar:
-                # --- MODELADO DE ENTRADAS DE SCALPING REALISTAS ---
-                if operacion_actual == "LONG":
+                # --- MODELADO DE ENTRADAS SEGÚN EL TIPO DE SEÑAL ---
+                if operacion_actual == "MEGA_LONG":
+                    # Ajustamos márgenes un poco más amplios para capturar el recorrido de la mega entrada
+                    tp_valor = precio_actual * (1 + 0.0050)
+                    sl_valor = precio_actual * (1 - 0.0030)
+                    setup_texto = (
+                        "💣 *¡MEGA ENTRADA DETECTADA: OPERAR LONG URGENTE!*\n"
+                        "⚠️ _Inyección masiva de contratos detectada en el orderbook._\n\n"
+                        "🟢 *Precio de Entrada:* `$" + f"{precio_actual:.2f}" + "`\n"
+                        "🎯 *Take Profit (Gran Ganancia):* `$" + f"{tp_valor:.2f}" + "` (+0.50%)\n"
+                        "🛑 *Stop Loss (Protección):* `$" + f"{sl_valor:.2f}" + "` (-0.30%)\n"
+                        "⚡ _Acción: Ejecutar orden de mercado inmediatamente._"
+                    )
+                elif operacion_actual == "MEGA_SHORT":
+                    tp_valor = precio_actual * (1 - 0.0050)
+                    sl_valor = precio_actual * (1 + 0.0030)
+                    setup_texto = (
+                        "💣 *¡MEGA ENTRADA DETECTADA: OPERAR SHORT URGENTE!*\n"
+                        "⚠️ _Liquidación en cadena o venta institucional masiva en progreso._\n\n"
+                        "🔴 *Precio de Entrada:* `$" + f"{precio_actual:.2f}" + "`\n"
+                        "🎯 *Take Profit (Gran Ganancia):* `$" + f"{tp_valor:.2f}" + "` (-0.50%)\n"
+                        "🛑 *Stop Loss (Protección):* `$" + f"{sl_valor:.2f}" + "` (+0.30%)\n"
+                        "⚡ _Acción: Ejecutar orden de mercado inmediatamente._"
+                    )
+                elif operacion_actual == "LONG":
                     tp_valor = precio_actual * (1 + PORCENTAJE_TP)
                     sl_valor = precio_actual * (1 - PORCENTAJE_SL)
                     setup_texto = (
@@ -137,7 +180,7 @@ def bucle_radar():
                         "🟢 *Precio Entrada:* `$" + f"{precio_actual:.2f}" + "`\n"
                         "🎯 *Take Profit (Corto):* `$" + f"{tp_valor:.2f}" + "` (+0.22%)\n"
                         "🛑 *Stop Loss (Seguridad):* `$" + f"{sl_valor:.2f}" + "` (-0.15%)\n"
-                        "⏱️ _Estrategia: Tendencia confirmada. Buscar salida en la próxima vela._"
+                        "⏱️ _Estrategia: Tendencia confirmada de scalping regular._"
                     )
                 elif operacion_actual == "SHORT":
                     tp_valor = precio_actual * (1 - PORCENTAJE_TP)
@@ -147,14 +190,15 @@ def bucle_radar():
                         "🔴 *Precio Entrada:* `$" + f"{precio_actual:.2f}" + "`\n"
                         "🎯 *Take Profit (Corto):* `$" + f"{tp_valor:.2f}" + "` (-0.22%)\n"
                         "🛑 *Stop Loss (Seguridad):* `$" + f"{sl_valor:.2f}" + "` (+0.15%)\n"
-                        "⏱️ _Estrategia: Tendencia confirmada. Buscar salida en la próxima vela._"
+                        "⏱️ _Estrategia: Tendencia confirmada de scalping regular._"
                     )
                 else:
-                    setup_texto = "⏳ *SUGERENCIA: ESPERAR EN COMPRENSIÓN*\n_Razón: Fluctuación inestable o mercado plano. No arriesgar comisiones._"
+                    setup_texto = "⏳ *SUGERENCIA: ESPERAR EN COMPRENSIÓN*\n_Razón: Variación débil. Evitar pérdidas innecesarias por comisiones._"
 
                 print("[RADAR] ETH: $" + str(precio_actual) + " | Var OI: " + str(delta_oi) + "%")
                 sys.stdout.flush()
 
+                # Construcción del reporte premium
                 msg = (
                     "🎯 *Radar Watson Operando*\n"
                     "══════════════════════\n"
@@ -178,10 +222,3 @@ def bucle_radar():
 
 @app.route('/')
 def home():
-    return "📡 Radar Hack Activo", 200
-
-threading.Thread(target=bucle_radar, daemon=True).start()
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
