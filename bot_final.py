@@ -9,94 +9,79 @@ from flask import Flask
 app = Flask(__name__)
 
 # =====================================================================
-# CONFIGURACIÓN COMPILADA DIRECTA (CANAL PÚBLICO - ALIAS DIRECTO)
+# CONFIGURACIÓN COMPILADA NATIVA INDESTRUCTIBLE
 # =====================================================================
 SYMBOL = "ETHUSDT"  
 INTERVALO_SEGUNDOS = 30  
 
-# Credenciales físicas inyectadas directamente sin mutaciones
-TELEGRAM_TOKEN = "8991347344:AAHDSp718hsWqd8uxceBN9D0_n5ZXqR6V1Q"
-TELEGRAM_CHAT_ID = "@bunkerop"  # Alias del canal público obligatorio
+# Credenciales fijadas en bloques puros para evitar alteraciones de formato
+TELEGRAM_TOKEN = "8991347344" + ":" + "AAHDSp718hsWqd8uxceBN9D0_n5ZXqR6V1Q"
+TELEGRAM_CHAT_ID = "@bunkerop"  
 
 PORCENTAJE_SL = 0.0015  
 PORCENTAJE_TP = 0.0022  
 
 def enviar_telegram(mensaje):
-    """Bypass regional utilizando espejos dinámicos con timeouts ultra-agresivos para Render."""
+    """Envío nativo estructurado por segmentos para asegurar las barras diagonales."""
+    if not TELEGRAM_TOKEN or ":" not in TELEGRAM_TOKEN:
+        print("❌ ERROR: Estructura de token rota.")
+        sys.stdout.flush()
+        return
+
     payload = {
         "chat_id": TELEGRAM_CHAT_ID, 
         "text": mensaje, 
         "parse_mode": "Markdown"
     }
-    cabeceras = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-
-    # Banco de rutas de evasión alternativas
-    url_espejo_1 = f"https://telegram-proxy.org{TELEGRAM_TOKEN}/sendMessage"
-    url_espejo_2 = f"https://teleapi.net{TELEGRAM_TOKEN}/sendMessage"
-    url_oficial = f"https://telegram.org{TELEGRAM_TOKEN}/sendMessage"
-
-    # Reducimos el timeout a 3 segundos para evitar que Render congele el hilo secundario
-    for indice, url in enumerate([url_espejo_1, url_espejo_2, url_oficial], start=1):
-        try:
-            print(f"🚀 Enviando alerta vía Canal de Evasión #{indice}... (Timeout: 3s)")
-            sys.stdout.flush()
-            
-            res = requests.post(url, json=payload, headers=cabeceras, timeout=3)
-            
-            if res.status_code == 200:
-                print(f"🟩 [TELEGRAM] Mensaje entregado con éxito en Canal #{indice}!")
-                sys.stdout.flush()
-                return
-            else:
-                print(f"⚠️ Canal #{indice} rechazó la entrega. Status: {res.status_code} | Info: {res.text[:100]}")
-                sys.stdout.flush()
-        except requests.exceptions.Timeout:
-            print(f"⏳ Canal #{indice} descartado por Timeout (Superó los 3 segundos).")
-            sys.stdout.flush()
-        except Exception as e:
-            print(f"❌ Canal #{indice} inaccesible por error crítico: {e}")
-            sys.stdout.flush()
-            
-    print("🚨 [CRÍTICO] Fin de ciclo: Ninguna ruta pudo conectar en esta iteración.")
-    sys.stdout.flush()
+    cabeceras = {"User-Agent": "Mozilla/5.0"}
+    
+    # Construcción segmentada de la URL oficial
+    base_api = "https://" + "api.telegram.org"
+    endpoint = base_api + "/bot" + TELEGRAM_TOKEN + "/sendMessage"
+    
+    try: 
+        res = requests.post(endpoint, json=payload, headers=cabeceras, timeout=10)
+        print(f"📡 [TELEGRAM] Status: {res.status_code} | Respuesta: {res.text}")
+        sys.stdout.flush()
+    except Exception as e: 
+        print(f"❌ Fallo crítico de red hacia Telegram: {e}")
+        sys.stdout.flush()
 
 def obtener_datos_mercado():
-    """Bypassea restricciones geográficas extrayendo datos estructurados de feeds alternativos."""
-    cabeceras = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    """Consumo de oráculos mediante aislamiento de parámetros query de red."""
+    cabeceras = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
-    # Oráculo 1: CoinGecko encapsulado correctamente a través de la API AllOrigins
+    # ORÁCULO 1: Puente AllOrigins con CoinGecko estructurado de forma segura
     try:
-        url_target = "https://coingecko.com"
-        proxy_url = f"https://allorigins.win{requests.utils.quote(url_target)}"
+        url_target = "https://" + "://coingecko.com"
+        proxy_url = "https://" + "api.allorigins.win/get?url=" + requests.utils.quote(url_target)
         
-        res = requests.get(proxy_url, headers=cabeceras, timeout=5).json()
+        res = requests.get(proxy_url, headers=cabeceras, timeout=8).json()
         data_limpia = json.loads(res['contents'])
         precio = float(data_limpia['ethereum']['usd'])
-        print(f"🟩 ORÁCULO 1 COMPILADO -> ETH: ${precio:.2f}")
+        print(f"🟩 HACK EXITOSO (CoinGecko via Proxy) -> ETH: ${precio:.2f}")
         sys.stdout.flush()
         return precio, 5000000.0, 15000000.0
     except Exception as e:
-        print(f"⚠️ Oráculo 1 (CoinGecko Proxy) inaccesible: {e}")
+        print(f"⚠️ Hack Pasarela 1 falló: {e}")
         sys.stdout.flush()
 
-    # Oráculo 2: API pública simplificada de Binance (Endpoint alternativo asiático sin restricciones)
+    # ORÁCULO 2: Acceso directo al endpoint secundario api3 de Binance (Bypass regional)
     try:
-        # api3 rutea el tráfico ignorando los geobloqueos regionales comunes del dominio principal
-        url_binance = "https://binance.com"
-        res = requests.get(url_binance, headers=cabeceras, timeout=5).json()
+        url_binance = "https://" + "://binance.com"
+        res = requests.get(url_binance, headers=cabeceras, timeout=6).json()
         precio = float(res['price'])
-        print(f"🟩 ORÁCULO 2 COMPILADO (Binance Mirror) -> ETH: ${precio:.2f}")
+        print(f"🟩 HACK EXITOSO (Binance Mirror Directo) -> ETH: ${precio:.2f}")
         sys.stdout.flush()
         return precio, 5000000.0, 15000000.0
     except Exception as e:
-        print(f"⚠️ Oráculo 2 (Binance Mirror) inaccesible: {e}")
+        print(f"⚠️ Hack Pasarela 2 falló: {e}")
         sys.stdout.flush()
 
     return None, None, None
 
 def bucle_radar():
+    """Hilo de ejecución continuo aislado para Render."""
     print("📡 RADAR INYECTADO: INICIANDO MONITOR INDESTRUCTIBLE")
     sys.stdout.flush()
     
@@ -112,7 +97,7 @@ def bucle_radar():
             precio_actual, _, _ = obtener_datos_mercado()
             
             if not precio_actual:
-                print("⏳ Oráculos saturados o bloqueados temporalmente. Reintentando...")
+                print("⏳ Oráculos saturados. Esperando próxima iteración...")
                 sys.stdout.flush()
                 continue
                 
@@ -125,7 +110,7 @@ def bucle_radar():
                 
             precio_anterior = precio_actual
         except Exception as e:
-            print(f"❌ Error en ejecución del radar: {e}")
+            print(f"❌ Error en bucle principal: {e}")
             sys.stdout.flush()
             time.sleep(5)
 
@@ -133,7 +118,7 @@ def bucle_radar():
 def home():
     return "📡 Radar Hack Activo", 200
 
-# Inicialización segura en segundo plano
+# Inicialización forzada del hilo de fondo
 threading.Thread(target=bucle_radar, daemon=True).start()
 
 if __name__ == '__main__':
