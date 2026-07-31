@@ -8,10 +8,9 @@ from flask import Flask
 app = Flask(__name__)
 
 # =====================================================================
-# CONFIGURACIÓN COMPILADA REAL DE DERIVADOS Y SCALPING
+# CONFIGURACIÓN COMPILADA REAL DE DERIVADOS Y SCALPING SUAVIZADO
 # =====================================================================
 SYMBOL = "ETHUSDT"  
-INTERVALO_SEGUNDOS = 30  
 
 TOKEN_LIMPIO = "8991347344:AAHDSp718hsWqd8uxceBN9D0_n5ZXqR6V1Q"
 CHAT_ID_LIMPIO = "-1004335003036"  
@@ -53,7 +52,6 @@ def obtener_datos_mercado_y_oi():
     precio = None
     oi = None
     
-    # URL fraccionada de forma segura
     url_base = 'https://api.' + 'kucoin.com'
     
     # 1. Obtener precio actual de ETH
@@ -72,88 +70,104 @@ def obtener_datos_mercado_y_oi():
         if res_oi.status_code == 200:
             oi = float(res_oi.json()["data"]["vol"])
     except:
-        oi = 5000000.0  # Respaldo si el servidor no responde rápido
+        oi = 5000000.0  # Respaldo de seguridad
         
     return precio, oi
 
 def bucle_radar():
-    """Analiza Precio + OI y genera setups de scalping reales y alcanzables."""
-    print("📡 RADAR INYECTADO: INICIANDO MONITOR INDESTRUCTIBLE")
+    """Bucle con suavizado de tiempo y filtro de confirmación para evitar señales falsas."""
+    print("📡 RADAR INYECTADO: CONFIGURANDO FILTRO DE SUAVIZADO")
     sys.stdout.flush()
     
-    enviar_telegram("📡 *Radar Watson Inteligente Activado*\nMonitoreando Precio, Variación de OI y Setups de Scalping...")
+    enviar_telegram("📡 *Módulo de Suavizado Activado*\nVentana de análisis ampliada a 3 minutos con filtro de consistencia para Scalping seguro.")
 
     precio_anterior, oi_anterior = obtener_datos_mercado_y_oi()
     if not precio_anterior:
         precio_anterior = 1868.0
     if not oi_anterior:
         oi_anterior = 5000000.0
+        
+    # Variables de memoria para el filtro de consistencia
+    operacion_anterior = "ESPERAR"
+    
+    # Ajustamos el intervalo a 3 minutos (180 segundos) para eliminar el ruido rápido
+    INTERVALO_SUAVIZADO = 180 
     
     while True:
         try:
-            time.sleep(INTERVALO_SEGUNDOS)
+            time.sleep(INTERVALO_SUAVIZADO)
             precio_actual, oi_actual = obtener_datos_mercado_y_oi()
             
             if not precio_actual or not oi_actual:
-                print("⏳ Esperando respuesta estable de los oráculos...")
-                sys.stdout.flush()
                 continue
                 
             delta_precio = ((precio_actual - precio_anterior) / precio_anterior) * 100
             delta_oi = ((oi_actual - oi_anterior) / oi_anterior) * 100
             
-            # --- LÓGICA DE DERIVADOS: COMBINACIÓN PRECIO + OI ---
-            if delta_precio > 0.005 and delta_oi > 0.01:
+            # --- EVALUACIÓN DE DIRECCIÓN CON UMBRAL DE FILTRO ---
+            if delta_precio > 0.015 and delta_oi > 0.03:
                 tendencia = "📈 ALCISTA (Confirmación por entrada de capital)"
-                operacion = "LONG"
-            elif delta_precio < -0.005 and delta_oi > 0.01:
+                operacion_actual = "LONG"
+            elif delta_precio < -0.015 and delta_oi > 0.03:
                 tendencia = "📉 BAJISTA (Confirmación por presión vendedora)"
-                operacion = "SHORT"
+                operacion_actual = "SHORT"
             else:
                 tendencia = "↕️ ENTORNO NEUTRO / CONSOLIDACIÓN CORTA"
-                operacion = "ESPERAR"
+                operacion_actual = "ESPERAR"
                 
-            # --- OPERACIONES DE SCALPING REALISTAS Y CORTAS ---
-            if operacion == "LONG":
-                tp_valor = precio_actual * (1 + PORCENTAJE_TP)
-                sl_valor = precio_actual * (1 - PORCENTAJE_SL)
-                setup_texto = (
-                    "🚀 *OPERACIÓN SUGERIDA: ENTRAR EN LONG*\n"
-                    "🟢 *Precio Entrada:* `$" + f"{precio_actual:.2f}" + "`\n"
-                    "🎯 *Take Profit (Corto):* `$" + f"{tp_valor:.2f}" + "` (+0.22%)\n"
-                    "🛑 *Stop Loss (Seguridad):* `$" + f"{sl_valor:.2f}" + "` (-0.15%)\n"
-                    "⏱️ _Estrategia: Tomar ganancias rápido en la próxima vela._"
-                )
-            elif operacion == "SHORT":
-                tp_valor = precio_actual * (1 - PORCENTAJE_TP)
-                sl_valor = precio_actual * (1 + PORCENTAJE_SL)
-                setup_texto = (
-                    "🚨 *OPERACIÓN SUGERIDA: ENTRAR EN SHORT*\n"
-                    "🔴 *Precio Entrada:* `$" + f"{precio_actual:.2f}" + "`\n"
-                    "🎯 *Take Profit (Corto):* `$" + f"{tp_valor:.2f}" + "` (-0.22%)\n"
-                    "🛑 *Stop Loss (Seguridad):* `$" + f"{sl_valor:.2f}" + "` (+0.15%)\n"
-                    "⏱️ _Estrategia: Tomar ganancias rápido en la próxima vela._"
-                )
+            # --- FILTRO DE CONSISTENCIA DE TRADING ---
+            debe_notificar = False
+            
+            if operacion_actual == "ESPERAR":
+                debe_notificar = True
+            elif operacion_actual == operacion_anterior:
+                debe_notificar = True
             else:
-                setup_texto = "⏳ *SUGERENCIA: ESPERAR EN COMPRENSIÓN*\n_Razón: Variación débil. Evitar pérdidas innecesarias por comisiones._"
+                print("⏳ Tendencia inestable detectada. Filtrando señal...")
+                sys.stdout.flush()
+                debe_notificar = False
 
-            print("[RADAR] ETH: $" + str(precio_actual) + " | Var OI: " + str(delta_oi) + "%")
-            sys.stdout.flush()
+            if debe_notificar:
+                # --- MODELADO DE ENTRADAS DE SCALPING REALISTAS ---
+                if operacion_actual == "LONG":
+                    tp_valor = precio_actual * (1 + PORCENTAJE_TP)
+                    sl_valor = precio_actual * (1 - PORCENTAJE_SL)
+                    setup_texto = (
+                        "🚀 *OPERACIÓN SUGERIDA: ENTRAR EN LONG*\n"
+                        "🟢 *Precio Entrada:* `$" + f"{precio_actual:.2f}" + "`\n"
+                        "🎯 *Take Profit (Corto):* `$" + f"{tp_valor:.2f}" + "` (+0.22%)\n"
+                        "🛑 *Stop Loss (Seguridad):* `$" + f"{sl_valor:.2f}" + "` (-0.15%)\n"
+                        "⏱️ _Estrategia: Tendencia confirmada. Buscar salida en la próxima vela._"
+                    )
+                elif operacion_actual == "SHORT":
+                    tp_valor = precio_actual * (1 - PORCENTAJE_TP)
+                    sl_valor = precio_actual * (1 + PORCENTAJE_SL)
+                    setup_texto = (
+                        "🚨 *OPERACIÓN SUGERIDA: ENTRAR EN SHORT*\n"
+                        "🔴 *Precio Entrada:* `$" + f"{precio_actual:.2f}" + "`\n"
+                        "🎯 *Take Profit (Corto):* `$" + f"{tp_valor:.2f}" + "` (-0.22%)\n"
+                        "🛑 *Stop Loss (Seguridad):* `$" + f"{sl_valor:.2f}" + "` (+0.15%)\n"
+                        "⏱️ _Estrategia: Tendencia confirmada. Buscar salida en la próxima vela._"
+                    )
+                else:
+                    setup_texto = "⏳ *SUGERENCIA: ESPERAR EN COMPRENSIÓN*\n_Razón: Fluctuación inestable o mercado plano. No arriesgar comisiones._"
+
+                print("[RADAR] ETH: $" + str(precio_actual) + " | Var OI: " + str(delta_oi) + "%")
+                sys.stdout.flush()
+
+                msg = (
+                    "🎯 *Radar Watson Operando*\n"
+                    "══════════════════════\n"
+                    "💰 *Precio ETH:* `$" + f"{precio_actual:.2f}" + "`\n"
+                    "📊 *Var. Precio (3m):* " + f"{delta_precio:+.3f}" + "%\n"
+                    "📈 *Var. OI (3m):* " + f"{delta_oi:+.3f}" + "%\n"
+                    "🔄 *Tipo de Tendencia:* " + tendencia + "\n"
+                    "══════════════════════\n"
+                    + setup_texto
+                )
+                enviar_telegram(msg)
             
-            # Mensaje con la plantilla de datos completa requerida
-            msg = (
-                "🎯 *Radar Watson Operando*\n"
-                "══════════════════════\n"
-                "💰 *Precio ETH:* `$" + f"{precio_actual:.2f}" + "`\n"
-                "📊 *Var. Precio (30s):* " + f"{delta_precio:+.3f}" + "%\n"
-                "📈 *Var. OI (30s):* " + f"{delta_oi:+.3f}" + "%\n"
-                "🔄 *Tipo de Tendencia:* " + tendencia + "\n"
-                "══════════════════════\n"
-                + setup_texto
-            )
-            
-            enviar_telegram(msg)
-            
+            operacion_anterior = operacion_actual
             precio_anterior = precio_actual
             oi_anterior = oi_actual
             
@@ -166,7 +180,6 @@ def bucle_radar():
 def home():
     return "📡 Radar Hack Activo", 200
 
-# Lanzamiento seguro del subproceso de fondo
 threading.Thread(target=bucle_radar, daemon=True).start()
 
 if __name__ == '__main__':
