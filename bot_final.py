@@ -178,8 +178,8 @@ def obtener_datos_institucionales():
         res_ob = requests.get(endpoint_ob, headers=cabeceras, timeout=6)
         if res_ob.status_code == 200:
             data_ob = res_ob.json()["data"]
-            vol_compras = sum(float(b[1]) for b in data_ob["bids"])
-            vol_ventas = sum(float(a[1]) for a in data_ob["asks"])
+            vol_compras = sum(float(b) for b in data_ob["bids"])
+            vol_ventas = sum(float(a) for a in data_ob["asks"])
             if (vol_compras + vol_ventas) > 0:
                 imbalance = (vol_compras / (vol_compras + vol_ventas)) * 100
     except:
@@ -192,18 +192,8 @@ def obtener_datos_institucionales():
         
     return precio, oi, imbalance, sentiment
 
-def validar_estabilidad_precio(precio_actual):
-    """Filtro de persistencia aislado para mitigar mechazos falsos sin romper bloques try."""
-    time.sleep(3)
-    p_check, _, _, _ = obtener_datos_institucionales()
-    if not p_check:
-        return None
-    if (abs(p_check - precio_actual) / precio_actual) > 0.0020:
-        return None
-    return p_check
-
 def bucle_radar():
-    """Bucle analítico lineal inmune a fallos de indentación con ejecución automática."""
+    """Bucle analítico lineal totalmente plano libre de bloques anidados."""
     print("📡 RADAR INYECTADO: CONFIGURANDO MODULO DE VOLATILIDAD")
     sys.stdout.flush()
     
@@ -243,3 +233,11 @@ def bucle_radar():
             if not es_mega_entrada:
                 if delta_precio > 0.015 and delta_oi > 0.03 and imbalance > 52.0:
                     operacion_actual = "LONG"
+                elif delta_precio < -0.015 and delta_oi > 0.03 and imbalance < 48.0:
+                    operacion_actual = "SHORT"
+                else:
+                    operacion_actual = "ESPERAR"
+
+            # --- 3. FILTRO DE CONSISTENCIA DINÁMICO ---
+            debe_notificar = False
+            if es_mega_entrada or operacion_actual == "ESPERAR" or operacion_actual == operacion_anterior:
