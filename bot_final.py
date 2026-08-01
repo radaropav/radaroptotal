@@ -95,6 +95,7 @@ def ejecutar_orden_automatica(symbol, direccion, precio_entrada, tp_precio, sl_p
     lado_salida = "SELL" if "LONG" in direccion else "BUY"
     
     try:
+        p_orden = {"symbol": symbol, "side": lado_entrada, "type": "MARKET", "quantity": quantity, "timestamp": int(time.time() * 1000)}
         p_orden = {"symbol": symbol, "side": lado_entrada, "type": "MARKET", "quantity": cantidad_eth, "timestamp": int(time.time() * 1000)}
         p_orden["signature"] = generar_firma_hmac(p_orden)
         requests.post(f"{BASE_URL_BINANCE}/fapi/v1/order", data=p_orden, headers=headers, timeout=5)
@@ -178,8 +179,8 @@ def obtener_datos_institucionales():
         res_ob = requests.get(endpoint_ob, headers=cabeceras, timeout=6)
         if res_ob.status_code == 200:
             data_ob = res_ob.json()["data"]
-            vol_compras = sum(float(b) for b in data_ob["bids"])
-            vol_ventas = sum(float(a) for a in data_ob["asks"])
+            vol_compras = sum(float(b[1]) for b in data_ob["bids"])
+            vol_ventas = sum(float(a[1]) for a in data_ob["asks"])
             if (vol_compras + vol_ventas) > 0:
                 imbalance = (vol_compras / (vol_compras + vol_ventas)) * 100
     except:
@@ -191,6 +192,20 @@ def obtener_datos_institucionales():
         if sentiment < 0: sentiment = 5.0
         
     return precio, oi, imbalance, sentiment
+
+def validar_estabilidad_precio(precio_actual):
+    """Filtro de persistencia aislado para mitigar mechazos falsos con control estricto."""
+    time.sleep(3)
+    try:
+        datos_confirmados = obtener_datos_institucionales()
+        if not datos_confirmados or datos_confirmados[0] is None:
+            return None
+        precio_confirmado = float(datos_confirmados[0])
+        if (abs(precio_confirmado - precio_actual) / precio_actual) > 0.0020:
+            return None
+        return precio_confirmado
+    except Exception:
+        return None
 
 def bucle_radar():
     """Bucle analítico secuencial totalmente plano libre de bloques anidados."""
@@ -227,19 +242,3 @@ def bucle_radar():
                 if delta_precio > 0:
                     operacion_actual = "MEGA_LONG"
                 else:
-                    operacion_actual = "MEGA_SHORT"
-            
-            # --- 2. EVALUACIÓN ESTÁNDAR ---
-            if not es_mega_entrada:
-                if delta_precio > 0.015 and delta_oi > 0.03 and imbalance > 52.0:
-                    operacion_actual = "LONG"
-                elif delta_precio < -0.015 and delta_oi > 0.03 and imbalance < 48.0:
-                    operacion_actual = "SHORT"
-                else:
-                    operacion_actual = "ESPERAR"
-
-            # --- 3. FILTRO DE CONSISTENCIA ---
-            debe_notificar = False
-            if es_mega_entrada or operacion_actual == operacion_anterior:
-                debe_notificar = True
-                
