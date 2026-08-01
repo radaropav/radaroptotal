@@ -1,208 +1,176 @@
+import os
 import time
 import requests
-import threading
-import os
-import sys
-import hmac
-import hashlib
-from flask import Flask
+from flask import Flask, request, jsonify
+from binance.client import Client
+from binance.exceptions import BinanceAPIException
 
 app = Flask(__name__)
 
-# =====================================================================
-# CONFIGURACIÓN COMPILADA REAL DE DERIVADOS CON MEGA ENTRADAS URGENTES
-# =====================================================================
-SYMBOL = "ETHUSDT"  
+# CONFIGURACIÓN DE CREDENCIALES FIJAS INYECTADAS
+SYMBOL = "ETHUSDT"
+TELEGRAM_TOKEN = "8991347344:AAHDSp718hsWqd8uxceBN9D0_n5ZXqR6V1Q"
+TELEGRAM_CHAT_ID = "-1004335003036"
 
-TOKEN_LIMPIO = "8991347344:AAHDSp718hsWqd8uxceBN9D0_n5ZXqR6V1Q"
-CHAT_ID_LIMPIO = "-1004335003036"  
-
-# Márgenes para operaciones estándar de Scalping rápido
-PORCENTAJE_SL = 0.0015  # 0.15% Stop Loss estándar
-PORCENTAJE_TP = 0.0022  # 0.22% Take Profit estándar
-
-# Umbrales críticos para capturar las "MEGA ENTRADAS" institucionales
-UMBRAL_MEGA_PRECIO = 0.40
-UMBRAL_MEGA_OI = 0.80
-
-# 🔐 EXTRACCIÓN DISCRETA DESDE VARIABLES DE ENTORNO EN RENDER
+# CREDENCIALES DE ENTORNO EN RENDER
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
 BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
-BASE_URL_BINANCE = "https://binance.com"
 
-# =====================================================================
-# MOTOR EJECUTOR AUTOMÁTICO EN BINANCE FUTUROS (NIVEL 2)
-# =====================================================================
-def generar_firma_hmac(params):
-    """Genera el candado SHA256 exigido por Binance para operaciones seguras."""
-    query_string = '&'.join([f"{k}={v}" for k, v in params.items()])
-    return hmac.new(
-        BINANCE_SECRET_KEY.encode('utf-8'), 
-        query_string.encode('utf-8'), 
-        hashlib.sha256
-    ).hexdigest()
+# Inicialización segura de Binance Client
+binance_client = None
+if BINANCE_API_KEY and BINANCE_SECRET_KEY:
+    binance_client = Client(BINANCE_API_KEY, BINANCE_SECRET_KEY)
 
-def consultar_saldo_neto():
-    """Consulta balance en USDT en vivo para aplicar interés compuesto al 100%."""
-    endpoint = f"{BASE_URL_BINANCE}/fapi/v2/account"
-    params = {"timestamp": int(time.time() * 1000)}
-    params["signature"] = generar_firma_hmac(params)
-    headers = {"X-MBX-APIKEY": BINANCE_API_KEY}
-    try:
-        response = requests.get(endpoint, params=params, headers=headers, timeout=5).json()
-        for asset in response.get("assets", []):
-            if asset["asset"] == "USDT":
-                return float(asset["walletBalance"])
-    except Exception as e:
-        print("⚠️ No se pudo leer balance en Binance: " + str(e))
-        sys.stdout.flush()
-    return 80.0  # Fallback seguro basado en tu capital actual
-
-def ajustar_leverage_dinamico(symbol, es_mega_entrada):
-    """Cambia potencia en milisegundos: X10 Estándar / X20 Mega Entrada."""
-    leverage = 20 if es_mega_entrada else 10
-    endpoint = f"{BASE_URL_BINANCE}/fapi/v1/leverage"
-    params = {
-        "symbol": symbol,
-        "leverage": leverage,
-        "timestamp": int(time.time() * 1000)
-    }
-    params["signature"] = generar_firma_hmac(params)
-    headers = {"X-MBX-APIKEY": BINANCE_API_KEY}
-    try:
-        requests.post(endpoint, data=params, headers=headers, timeout=5)
-    except Exception as e:
-        print("⚠️ Fallo al configurar apalancamiento: " + str(e))
-        sys.stdout.flush()
-    return leverage
-
-def ejecutar_orden_automatica(symbol, direccion, precio_entrada, tp_precio, sl_precio, es_mega_entrada=False):
-    """Lanza la entrada a mercado y amarra inmediatamente el TP y SL en Binance."""
-    if not BINANCE_API_KEY or not BINANCE_SECRET_KEY:
-        print("❌ Error: API Keys no configuradas en Render Environment.")
-        sys.stdout.flush()
-        return
-
-    headers = {"X-MBX-APIKEY": BINANCE_API_KEY}
-    
-    leverage = ajustar_leverage_dinamico(symbol, es_mega_entrada)
-    saldo = consultar_saldo_neto()
-    
-    capital_operativo = saldo if saldo < 400.0 else (saldo * 0.5)
-    cantidad_eth = round((capital_operativo * leverage) / precio_entrada, 3)
-    
-    lado_entrada = "BUY" if "LONG" in direccion else "SELL"
-    lado_salida = "SELL" if "LONG" in direccion else "BUY"
-    
-    try:
-        # CORRECCIÓN 1: Se eliminó la línea duplicada de arriba que llamaba a 'quantity' (variable inexistente)
-        p_orden = {"symbol": symbol, "side": lado_entrada, "type": "MARKET", "quantity": cantidad_eth, "timestamp": int(time.time() * 1000)}
-        p_orden["signature"] = generar_firma_hmac(p_orden)
-        requests.post(f"{BASE_URL_BINANCE}/fapi/v1/order", data=p_orden, headers=headers, timeout=5)
-        
-        p_tp = {"symbol": symbol, "side": lado_salida, "type": "TAKE_PROFIT_MARKET", "stopPrice": round(tp_precio, 2), "closePosition": "true", "timestamp": int(time.time() * 1000)}
-        p_tp["signature"] = generar_firma_hmac(p_tp)
-        requests.post(f"{BASE_URL_BINANCE}/fapi/v1/order", data=p_tp, headers=headers, timeout=5)
-        
-        p_sl = {"symbol": symbol, "side": lado_salida, "type": "STOP_MARKET", "stopPrice": round(sl_precio, 2), "closePosition": "true", "timestamp": int(time.time() * 1000)}
-        p_sl["signature"] = generar_firma_hmac(p_sl)
-        requests.post(f"{BASE_URL_BINANCE}/fapi/v1/order", data=p_sl, headers=headers, timeout=5)
-        
-        print(f"🎯 [EJECUCIÓN] Orden {direccion} colocada con éxito en Binance.")
-        sys.stdout.flush()
-    except Exception as e:
-        print("❌ Error crítico en envío de órdenes a Binance: " + str(e))
-        sys.stdout.flush()
-
-# =====================================================================
-# ENLACES DE FLUJO ORIGINALES DE SEÑALES E INSTITUCIONALES
-# =====================================================================
 def enviar_telegram(mensaje):
-    """Envío nativo con URL fraccionada de forma simple para evitar mutilaciones."""
-    parte1 = 'https://api.'
-    parte2 = 'telegram.org/bot'
-    parte3 = '/sendMessage'
-    
-    url_final = parte1 + parte2 + TOKEN_LIMPIO + parte3
-    
-    payload = {
-        "chat_id": CHAT_ID_LIMPIO, 
-        "text": mensaje, 
-        "parse_mode": "Markdown"
-    }
-    cabeceras = {"User-Agent": "Mozilla/5.0"}
-    
-    try: 
-        res = requests.post(url_final, json=payload, headers=cabeceras, timeout=10)
-        print("📡 [TELEGRAM] Status: " + str(res.status_code))
-        sys.stdout.flush()
-    except Exception as e: 
-        print("❌ Fallo en enlace de Telegram: " + str(e))
-        sys.stdout.flush()
-
-def obtener_datos_institucionales():
-    """Consumo y modelado de datos redundantes de derivados y orderbook."""
-    cabeceras = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "application/json"
-    }
-    
-    precio = None
-    oi = None
-    imbalance = 50.0
-    sentiment = 50.0
-    
-    url_base = 'https://api.' + 'kucoin.com'
-    
+    """Envía notificaciones de auditoría directamente al canal público."""
+    url = f"https://telegram.org{TELEGRAM_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mensaje, "parse_mode": "Markdown"}
     try:
-        endpoint_p = url_base + "/api/v1/market/orderbook/level1?symbol=ETH-USDT"
-        res = requests.get(endpoint_p, headers=cabeceras, timeout=6)
-        if res.status_code == 200:
-            data = res.json()
-            if "data" in data and "price" in data["data"]:
-                precio = float(data["data"]["price"])
-    except:
-        precio = None
-
-    try:
-        endpoint_s = url_base + "/api/v1/market/stats?symbol=ETH-USDT"
-        res_oi = requests.get(endpoint_s, headers=cabeceras, timeout=6)
-        if res_oi.status_code == 200:
-            data_oi = res_oi.json()
-            if "data" in data_oi and "vol" in data_oi["data"]:
-                oi = float(data_oi["data"]["vol"])
-    except:
-        oi = 5000000.0
-
-    try:
-        endpoint_ob = url_base + "/api/v1/market/orderbook/level20?symbol=ETH-USDT"
-        res_ob = requests.get(endpoint_ob, headers=cabeceras, timeout=6)
-        if res_ob.status_code == 200:
-            data_ob = res_ob.json()["data"]
-            vol_compras = sum(float(b[1]) for b in data_ob["bids"])
-            vol_ventas = sum(float(a[1]) for a in data_ob["asks"])
-            if (vol_compras + vol_ventas) > 0:
-                imbalance = (vol_compras / (vol_compras + vol_ventas)) * 100
-    except:
-        imbalance = 50.0
-
-    if precio:
-        sentiment = (imbalance * 1.05) if imbalance > 50 else (imbalance * 0.95)
-        if sentiment > 100: sentiment = 95.0
-        if sentiment < 0: sentiment = 5.0
-        
-    return precio, oi, imbalance, sentiment
-
-def validar_estabilidad_precio(precio_actual):
-    """Filtro de persistencia aislado para mitigar mechazos falsos con control estricto."""
-    time.sleep(3)
-    try:
-        datos_confirmados = obtener_datos_institucionales()
-        # CORRECCIÓN 2: Se reparó la línea mocha 'if not datos_confirmados or dat' cerrando el bloque limpiamente
-        if not datos_confirmados:
-            return False
-        return True
+        requests.post(url, json=payload, timeout=5)
     except Exception as e:
-        print("⚠️ Error al validar estabilidad: " + str(e))
-        sys.stdout.flush()
+        print(f"Error de Telegram: {e}")
+
+def obtener_datos_oraculo():
+    """Oráculo Descentralizado: Extrae el precio de mercado base de GateIO para evitar latencias."""
+    try:
+        response = requests.get(f"https://gateio.ws{SYMBOL.replace('USDT', '_USDT')}", timeout=4)
+        if response.status_code == 200:
+            data = response.json()
+            return float(data[0]['last'])
+    except Exception:
+        pass
+    
+    # Fallback si GateIO no responde
+    try:
+        if binance_client:
+            ticker = binance_client.futures_symbol_ticker(symbol=SYMBOL)
+            return float(ticker['price'])
+    except Exception as e:
+        print(f"Error en Oráculo: {e}")
+    return None
+
+def validar_estabilidad_precio(precio_inicial):
+    """Filtro Anti-Mechazos Isolado (Evita trampas de bots / spoofing)."""
+    time.sleep(3)
+    precio_final = obtener_datos_oraculo()
+    if not precio_final:
         return False
+    
+    variacion = abs((precio_final - precio_inicial) / precio_inicial)
+    if variacion > 0.0020:  # Mayor a 0.20%
+        return False
+    return True
+
+def calcular_capital_orden(balance_actual):
+    """Interés compuesto automático con Guardrail de seguridad a $400 USD."""
+    if balance_actual > 400.0:
+        return balance_actual * 0.50  # Reduce riesgo al 50%
+    return balance_actual * 1.00  # Usa el 100% (~$80 USD iniciales)
+
+def ejecutar_brackets_binance(direccion, precio, variacion_senial):
+    """Ejecuta orden de mercado con brackets acoplados (TP/SL) y reduceOnly activo."""
+    if not binance_client:
+        return "Cliente Binance no configurado en variables de entorno."
+
+    try:
+        # 1. Definición de Setup y Apalancamiento Dinámico según fuerza de la variación
+        if variacion_senial >= 0.40:
+            leverage, tp_pct, sl_pct = 20, 0.0050, 0.0030  # Mega Entrada (TP: +0.50% / SL: -0.30%)
+        else:
+            leverage, tp_pct, sl_pct = 10, 0.0022, 0.0015  # Operación Estándar (TP: +0.22% / SL: -0.15%)
+
+        binance_client.futures_change_leverage(symbol=SYMBOL, leverage=leverage)
+        
+        # 2. Balance e interés compuesto para determinar cantidad
+        account_info = binance_client.futures_account()
+        balance_actual = float(account_info.get('availableBalance', 0))
+        capital_riesgo = calcular_capital_orden(balance_actual)
+        
+        # Cantidad nocional calculando el apalancamiento
+        quantity = round((capital_riesgo * leverage) / precio, 3)
+        if quantity <= 0:
+            return f"Capital insuficiente para operar: {balance_actual} USD"
+
+        # 3. Disparar Orden Principal al Mercado (MARKET)
+        side_principal = Client.SIDE_BUY if direccion == "LONG" else Client.SIDE_SELL
+        side_cobertura = Client.SIDE_SELL if direccion == "LONG" else Client.SIDE_BUY
+        
+        orden_market = binance_client.futures_create_order(
+            symbol=SYMBOL,
+            side=side_principal,
+            type=Client.FUTURE_ORDER_TYPE_MARKET,
+            quantity=quantity
+        )
+
+        # 4. Calcular precios exactos de Brackets
+        if direccion == "LONG":
+            tp_price = round(precio * (1 + tp_pct), 2)
+            sl_price = round(precio * (1 - sl_pct), 2)
+        else:
+            tp_price = round(precio * (1 - tp_pct), 2)
+            sl_price = round(precio * (1 + sl_pct), 2)
+
+        # 5. Enviar Órdenes Bracket con reduceOnly=True
+        binance_client.futures_create_order(
+            symbol=SYMBOL,
+            side=side_cobertura,
+            type='TAKE_PROFIT_MARKET',
+            stopPrice=tp_price,
+            closePosition=True,
+            reduceOnly=True
+        )
+        
+        binance_client.futures_create_order(
+            symbol=SYMBOL,
+            side=side_cobertura,
+            type='STOP_MARKET',
+            stopPrice=sl_price,
+            closePosition=True,
+            reduceOnly=True
+        )
+
+        msg = f"🚀 *{direccion} Ejecutado* x{leverage}\n💰 Precio: {precio}\n📦 Qty: {quantity}\n🎯 TP: {tp_price}\n🛑 SL: {sl_price}"
+        enviar_telegram(msg)
+        return "Operación ejecutada con Brackets correctamente."
+
+    except BinanceAPIException as e:
+        error_msg = f"❌ *Error Binance API:* {e.message} (Código {e.code})"
+        enviar_telegram(error_msg)
+        return error_msg
+    except Exception as e:
+        error_msg = f"❌ *Error crítico:* {str(e)}"
+        enviar_telegram(error_msg)
+        return error_msg
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """Punto de entrada plano y lineal para procesar señales externas sin fallos de indentación."""
+    data = request.get_json() or {}
+    direccion = data.get("direccion")  # "LONG" o "SHORT"
+    variacion_senial = float(data.get("variacion", 0.0)) # Variación porcentual de la señal
+
+    if direccion not in ["LONG", "SHORT"]:
+        return jsonify({"status": "ignorado", "reason": "Dirección inválida"}), 400
+
+    precio_oraculo = obtener_datos_oraculo()
+    if not precio_oraculo:
+        return jsonify({"status": "error", "reason": "Oráculo no disponible"}), 500
+
+    # Filtro anti-mechazos
+    if not validar_estabilidad_precio(precio_oraculo):
+        enviar_telegram(f"⚠️ *Disparo Cancelado:* Inestabilidad o Mechazo detectado en {SYMBOL}.")
+        return jsonify({"status": "cancelado", "reason": "Filtro anti-mechazos activado"}), 200
+
+    # Ejecución directa de la orden en Binance Futures
+    resultado = ejecutar_brackets_binance(direccion, precio_oraculo, variacion_senial)
+    return jsonify({"status": "procesado", "resultado": resultado}), 200
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Endpoint para el pulso de UptimeRobot."""
+    return jsonify({"status": "active", "bot": "Watson V2"}), 200
+
+if __name__ == '__main__':
+    # Render asigna el puerto mediante la variable de entorno PORT, fallback al puerto 10000
+    port = int(os.getenv("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
