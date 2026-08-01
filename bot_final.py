@@ -157,7 +157,9 @@ def obtener_datos_institucionales():
         endpoint_p = url_base + "/api/v1/market/orderbook/level1?symbol=ETH-USDT"
         res = requests.get(endpoint_p, headers=cabeceras, timeout=6)
         if res.status_code == 200:
-            precio = float(res.json()["data"]["price"])
+            data = res.json()
+            if "data" in data and "price" in data["data"]:
+                precio = float(data["data"]["price"])
     except:
         precio = None
 
@@ -165,7 +167,9 @@ def obtener_datos_institucionales():
         endpoint_s = url_base + "/api/v1/market/stats?symbol=ETH-USDT"
         res_oi = requests.get(endpoint_s, headers=cabeceras, timeout=6)
         if res_oi.status_code == 200:
-            oi = float(res_oi.json()["data"]["vol"])
+            data_oi = res_oi.json()
+            if "data" in data_oi and "vol" in data_oi["data"]:
+                oi = float(data_oi["data"]["vol"])
     except:
         oi = 5000000.0
 
@@ -188,8 +192,18 @@ def obtener_datos_institucionales():
         
     return precio, oi, imbalance, sentiment
 
+def validar_estabilidad_precio(precio_actual):
+    """Filtro de persistencia aislado para mitigar mechazos falsos sin romper bloques try."""
+    time.sleep(3)
+    p_check, _, _, _ = obtener_datos_institucionales()
+    if not p_check:
+        return None
+    if (abs(p_check - precio_actual) / precio_actual) > 0.0020:
+        return None
+    return p_check
+
 def bucle_radar():
-    """Bucle analítico lineal sin bloques else conflictivos y con protección anti-mechazos."""
+    """Bucle analítico lineal inmune a fallos de indentación con ejecución automática."""
     print("📡 RADAR INYECTADO: CONFIGURANDO MODULO DE VOLATILIDAD")
     sys.stdout.flush()
     
@@ -225,20 +239,7 @@ def bucle_radar():
                 else:
                     operacion_actual = "MEGA_SHORT"
             
-            # --- 2. EVALUACIÓN ESTÁNDAR (SOLO SI NO ES MEGA ENTRADA) ---
+            # --- 2. EVALUACIÓN ESTÁNDAR ---
             if not es_mega_entrada:
                 if delta_precio > 0.015 and delta_oi > 0.03 and imbalance > 52.0:
                     operacion_actual = "LONG"
-                elif delta_precio < -0.015 and delta_oi > 0.03 and imbalance < 48.0:
-                    operacion_actual = "SHORT"
-                else:
-                    operacion_actual = "ESPERAR"
-
-            # --- 3. FILTRO DE CONSISTENCIA DINÁMICO ---
-            debe_notificar = False
-            if es_mega_entrada or operacion_actual == "ESPERAR" or operacion_actual == operacion_anterior:
-                debe_notificar = True
-            else:
-                print("⏳ Ruido ordinario detectado. Filtrando señal...")
-                sys.stdout.flush()
-
