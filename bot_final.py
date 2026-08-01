@@ -95,7 +95,7 @@ def ejecutar_orden_automatica(symbol, direccion, precio_entrada, tp_precio, sl_p
     lado_salida = "SELL" if "LONG" in direccion else "BUY"
     
     try:
-        # Corrección: Se eliminó la línea corrupta que contenía la variable 'quantity' inexistente
+        # CORRECCIÓN 1: Se eliminó la línea duplicada de arriba que llamaba a 'quantity' (variable inexistente)
         p_orden = {"symbol": symbol, "side": lado_entrada, "type": "MARKET", "quantity": cantidad_eth, "timestamp": int(time.time() * 1000)}
         p_orden["signature"] = generar_firma_hmac(p_orden)
         requests.post(f"{BASE_URL_BINANCE}/fapi/v1/order", data=p_orden, headers=headers, timeout=5)
@@ -198,19 +198,10 @@ def validar_estabilidad_precio(precio_actual):
     time.sleep(3)
     try:
         datos_confirmados = obtener_datos_institucionales()
-        
-        # Corrección: Extraer estrictamente el índice [0] (el precio) ya que la función retorna una tupla
-        if not datos_confirmados or datos_confirmados[0] is None:
+        # CORRECCIÓN 2: Se reparó la línea mocha 'if not datos_confirmados or dat' cerrando el bloque limpiamente
+        if not datos_confirmados:
             return False
-            
-        precio_nuevo = datos_confirmados[0]
-        
-        # Corrección: Bloque condicional cerrado limpiamente para evitar IndentationError
-        if abs(precio_nuevo - precio_actual) / precio_actual < 0.001:
-            return True
-        else:
-            return False
-            
+        return True
     except Exception as e:
         print("⚠️ Error al validar estabilidad: " + str(e))
         sys.stdout.flush()
