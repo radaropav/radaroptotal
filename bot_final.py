@@ -85,11 +85,9 @@ def ejecutar_orden_automatica(symbol, direccion, precio_entrada, tp_precio, sl_p
 
     headers = {"X-MBX-APIKEY": BINANCE_API_KEY}
     
-    # 1. Ajuste de apalancamiento dinámico y consulta de balance real
     leverage = ajustar_leverage_dinamico(symbol, es_mega_entrada)
     saldo = consultar_saldo_neto()
     
-    # Gestión de riesgo automática: 100% hasta $400 / 50% después
     capital_operativo = saldo if saldo < 400.0 else (saldo * 0.5)
     cantidad_eth = round((capital_operativo * leverage) / precio_entrada, 3)
     
@@ -97,17 +95,14 @@ def ejecutar_orden_automatica(symbol, direccion, precio_entrada, tp_precio, sl_p
     lado_salida = "SELL" if "LONG" in direccion else "BUY"
     
     try:
-        # 👉 ORDEN 1: Lanzamiento de la orden de Entrada a Mercado
         p_orden = {"symbol": symbol, "side": lado_entrada, "type": "MARKET", "quantity": cantidad_eth, "timestamp": int(time.time() * 1000)}
         p_orden["signature"] = generar_firma_hmac(p_orden)
         requests.post(f"{BASE_URL_BINANCE}/fapi/v1/order", data=p_orden, headers=headers, timeout=5)
         
-        # 💰 ORDEN 2: Colocación del Bracket de Take Profit Autónomo
         p_tp = {"symbol": symbol, "side": lado_salida, "type": "TAKE_PROFIT_MARKET", "stopPrice": round(tp_precio, 2), "closePosition": "true", "timestamp": int(time.time() * 1000)}
         p_tp["signature"] = generar_firma_hmac(p_tp)
         requests.post(f"{BASE_URL_BINANCE}/fapi/v1/order", data=p_tp, headers=headers, timeout=5)
         
-        # 🛡️ ORDEN 3: Colocación del Bracket de Stop Loss / Cinturón de Seguridad
         p_sl = {"symbol": symbol, "side": lado_salida, "type": "STOP_MARKET", "stopPrice": round(sl_precio, 2), "closePosition": "true", "timestamp": int(time.time() * 1000)}
         p_sl["signature"] = generar_firma_hmac(p_sl)
         requests.post(f"{BASE_URL_BINANCE}/fapi/v1/order", data=p_sl, headers=headers, timeout=5)
@@ -158,7 +153,6 @@ def obtener_datos_institucionales():
     
     url_base = 'https://api.' + 'kucoin.com'
     
-    # 1. Extracción del Precio Actual de Mercado
     try:
         endpoint_p = url_base + "/api/v1/market/orderbook/level1?symbol=ETH-USDT"
         res = requests.get(endpoint_p, headers=cabeceras, timeout=6)
@@ -167,7 +161,6 @@ def obtener_datos_institucionales():
     except:
         precio = None
 
-    # 2. Extracción y Estimación de Variación del Open Interest (OI)
     try:
         endpoint_s = url_base + "/api/v1/market/stats?symbol=ETH-USDT"
         res_oi = requests.get(endpoint_s, headers=cabeceras, timeout=6)
@@ -176,20 +169,18 @@ def obtener_datos_institucionales():
     except:
         oi = 5000000.0
 
-    # 3. Orderbook Imbalance (Paredes de Dinero Asks vs Bids)
     try:
         endpoint_ob = url_base + "/api/v1/market/orderbook/level20?symbol=ETH-USDT"
         res_ob = requests.get(endpoint_ob, headers=cabeceras, timeout=6)
         if res_ob.status_code == 200:
             data_ob = res_ob.json()["data"]
-            vol_compras = sum(float(b) for b in data_ob["bids"])
-            vol_ventas = sum(float(a) for a in data_ob["asks"])
+            vol_compras = sum(float(b[1]) for b in data_ob["bids"])
+            vol_ventas = sum(float(a[1]) for a in data_ob["asks"])
             if (vol_compras + vol_ventas) > 0:
                 imbalance = (vol_compras / (vol_compras + vol_ventas)) * 100
     except:
         imbalance = 50.0
 
-    # 4. Long/Short Ratio de Sentimiento (Anti-Retail Engine)
     if precio:
         sentiment = (imbalance * 1.05) if imbalance > 50 else (imbalance * 0.95)
         if sentiment > 100: sentiment = 95.0
@@ -198,7 +189,7 @@ def obtener_datos_institucionales():
     return precio, oi, imbalance, sentiment
 
 def bucle_radar():
-    """Bucle analítico con suavizado de 3m, filtro anti-mechazo de persistencia y ejecución Nivel 2."""
+    """Bucle analítico lineal sin bloques else conflictivos y con protección anti-mechazos."""
     print("📡 RADAR INYECTADO: CONFIGURANDO MODULO DE VOLATILIDAD")
     sys.stdout.flush()
     
@@ -224,15 +215,30 @@ def bucle_radar():
             
             es_mega_entrada = False
             setup_texto = ""
+            operacion_actual = "ESPERAR"
             
-            # --- DETECTOR DE RUN INTENSIVO (MEGA ENTRADAS) ---
+            # --- 1. DETECTOR DE RUN INTENSIVO (MEGA ENTRADAS) ---
             if abs(delta_precio) >= UMBRAL_MEGA_PRECIO or abs(delta_oi) >= UMBRAL_MEGA_OI:
                 es_mega_entrada = True
                 if delta_precio > 0:
-                    tendencia = "🔥 ¡ALERTA CRÍTICA: RUPTURA ALCISTA INSTITUCIONAL! 🔥"
                     operacion_actual = "MEGA_LONG"
                 else:
-                    tendencia = "🔥 ¡ALERTA CRÍTICA: CAPITULACIÓN BAJISTA VIOLENTA! 🔥"
                     operacion_actual = "MEGA_SHORT"
+            
+            # --- 2. EVALUACIÓN ESTÁNDAR (SOLO SI NO ES MEGA ENTRADA) ---
+            if not es_mega_entrada:
+                if delta_precio > 0.015 and delta_oi > 0.03 and imbalance > 52.0:
+                    operacion_actual = "LONG"
+                elif delta_precio < -0.015 and delta_oi > 0.03 and imbalance < 48.0:
+                    operacion_actual = "SHORT"
+                else:
+                    operacion_actual = "ESPERAR"
+
+            # --- 3. FILTRO DE CONSISTENCIA DINÁMICO ---
+            debe_notificar = False
+            if es_mega_entrada or operacion_actual == "ESPERAR" or operacion_actual == operacion_anterior:
+                debe_notificar = True
             else:
-                # --- EVALUACIÓN DE DIRECCIÓN ESTÁNDAR SUAVIZADA ---
+                print("⏳ Ruido ordinario detectado. Filtrando señal...")
+                sys.stdout.flush()
+
