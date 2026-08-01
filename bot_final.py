@@ -193,7 +193,7 @@ def obtener_datos_institucionales():
     return precio, oi, imbalance, sentiment
 
 def bucle_radar():
-    """Bucle analítico secuencial e inmune a problemas de indentación estructural."""
+    """Bucle analítico secuencial totalmente plano libre de bloques anidados."""
     print("📡 RADAR INYECTADO: CONFIGURANDO MODULO DE VOLATILIDAD")
     sys.stdout.flush()
     
@@ -221,7 +221,7 @@ def bucle_radar():
             setup_texto = ""
             operacion_actual = "ESPERAR"
             
-            # --- 1. EVALUACIÓN DE SEÑALES CRÍTICAS INSTITUCIONALES ---
+            # --- 1. DETECTOR DE RUN INTENSIVO (MEGA ENTRADAS) ---
             if abs(delta_precio) >= UMBRAL_MEGA_PRECIO or abs(delta_oi) >= UMBRAL_MEGA_OI:
                 es_mega_entrada = True
                 if delta_precio > 0:
@@ -229,7 +229,7 @@ def bucle_radar():
                 else:
                     operacion_actual = "MEGA_SHORT"
             
-            # --- 2. EVALUACIÓN DE SEÑALES ORDINARIAS SUAVIZADAS ---
+            # --- 2. EVALUACIÓN ESTÁNDAR ---
             if not es_mega_entrada:
                 if delta_precio > 0.015 and delta_oi > 0.03 and imbalance > 52.0:
                     operacion_actual = "LONG"
@@ -238,5 +238,8 @@ def bucle_radar():
                 else:
                     operacion_actual = "ESPERAR"
 
-            # --- 3. FILTRO FILTRADO Y VALIDACIÓN DE NOTIFICACIONES ---
+            # --- 3. FILTRO DE CONSISTENCIA ---
             debe_notificar = False
+            if es_mega_entrada or operacion_actual == operacion_anterior:
+                debe_notificar = True
+                
