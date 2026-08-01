@@ -182,8 +182,8 @@ def obtener_datos_institucionales():
         res_ob = requests.get(endpoint_ob, headers=cabeceras, timeout=6)
         if res_ob.status_code == 200:
             data_ob = res_ob.json()["data"]
-            vol_compras = sum(float(b[1]) for b in data_ob["bids"])
-            vol_ventas = sum(float(a[1]) for a in data_ob["asks"])
+            vol_compras = sum(float(b) for b in data_ob["bids"])
+            vol_ventas = sum(float(a) for a in data_ob["asks"])
             if (vol_compras + vol_ventas) > 0:
                 imbalance = (vol_compras / (vol_compras + vol_ventas)) * 100
     except:
@@ -235,3 +235,4 @@ def bucle_radar():
                     tendencia = "🔥 ¡ALERTA CRÍTICA: CAPITULACIÓN BAJISTA VIOLENTA! 🔥"
                     operacion_actual = "MEGA_SHORT"
             else:
+                # --- EVALUACIÓN DE DIRECCIÓN ESTÁNDAR SUAVIZADA ---
