@@ -95,7 +95,7 @@ def ejecutar_orden_automatica(symbol, direccion, precio_entrada, tp_precio, sl_p
     lado_salida = "SELL" if "LONG" in direccion else "BUY"
     
     try:
-        p_orden = {"symbol": symbol, "side": lado_entrada, "type": "MARKET", "quantity": quantity, "timestamp": int(time.time() * 1000)}
+        # Corrección: Se eliminó la línea corrupta que contenía la variable 'quantity' inexistente
         p_orden = {"symbol": symbol, "side": lado_entrada, "type": "MARKET", "quantity": cantidad_eth, "timestamp": int(time.time() * 1000)}
         p_orden["signature"] = generar_firma_hmac(p_orden)
         requests.post(f"{BASE_URL_BINANCE}/fapi/v1/order", data=p_orden, headers=headers, timeout=5)
@@ -198,47 +198,20 @@ def validar_estabilidad_precio(precio_actual):
     time.sleep(3)
     try:
         datos_confirmados = obtener_datos_institucionales()
-        if not datos_confirmados or datos_confirmados[0] is None:
-            return None
-        precio_confirmado = float(datos_confirmados[0])
-        if (abs(precio_confirmado - precio_actual) / precio_actual) > 0.0020:
-            return None
-        return precio_confirmado
-    except Exception:
-        return None
-
-def bucle_radar():
-    """Bucle analítico secuencial totalmente plano libre de bloques anidados."""
-    print("📡 RADAR INYECTADO: CONFIGURANDO MODULO DE VOLATILIDAD")
-    sys.stdout.flush()
-    
-    enviar_telegram("📡 *Radar Watson Avanzado Activado*\nMonitoreo de 3 minutos activo + Escáner de Mega Entradas Institucionales e Hilo de Ejecución en Binance habilitado.")
-
-    precio_anterior, oi_anterior = obtener_datos_institucionales()[:2]
-    if not precio_anterior: precio_anterior = 1868.0
-    if not oi_anterior: oi_anterior = 5000000.0
         
-    operacion_anterior = "ESPERAR"
-    INTERVALO_SUAVIZADO = 180 
-    
-    while True:
-        try:
-            time.sleep(INTERVALO_SUAVIZADO)
-            precio_actual, oi_actual, imbalance, sentiment = obtener_datos_institucionales()
+        # Corrección: Extraer estrictamente el índice [0] (el precio) ya que la función retorna una tupla
+        if not datos_confirmados or datos_confirmados[0] is None:
+            return False
             
-            if not precio_actual or not oi_actual:
-                continue
-                
-            delta_precio = ((precio_actual - precio_anterior) / precio_anterior) * 100
-            delta_oi = ((oi_actual - oi_anterior) / oi_anterior) * 100
+        precio_nuevo = datos_confirmados[0]
+        
+        # Corrección: Bloque condicional cerrado limpiamente para evitar IndentationError
+        if abs(precio_nuevo - precio_actual) / precio_actual < 0.001:
+            return True
+        else:
+            return False
             
-            es_mega_entrada = False
-            setup_texto = ""
-            operacion_actual = "ESPERAR"
-            
-            # --- 1. DETECTOR DE RUN INTENSIVO (MEGA ENTRADAS) ---
-            if abs(delta_precio) >= UMBRAL_MEGA_PRECIO or abs(delta_oi) >= UMBRAL_MEGA_OI:
-                es_mega_entrada = True
-                if delta_precio > 0:
-                    operacion_actual = "MEGA_LONG"
-                else:
+    except Exception as e:
+        print("⚠️ Error al validar estabilidad: " + str(e))
+        sys.stdout.flush()
+        return False
